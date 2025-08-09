@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docie</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://unpkg.com">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <script src="https://unpkg.com/mammoth@1.4.1/mammoth.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.min.js"></script>
+    <script src="https://unpkg.com/epubjs@0.3.93/dist/epub.min.js"></script>
+</head>
+<body>
+    <header class="app-header">
+        <h1 class="app-title">Docie</br>What are we reading Today?</h1>
+        <nav class="tabs-container">
+            <button class="tab-button active" data-tab="browse">Browse</button>
+            <button class="tab-button" data-tab="recent">Recently Opened</button>
+            <button class="tab-button" data-tab="favorites">Favorites</button>
+            <button class="tab-button" data-tab="about">About</button>
+        </nav>
+    </header>
+
+    <main class="main-content">
+        <section id="browse-tab" class="tab-content active">
+            <div class="upload-area">
+                <p>Select your file (.docx, .pdf, .epub, .txt) to start reading.</p>
+                <input type="file" id="file-input" accept=".docx,.pdf,.epub,.txt" style="display: none;">
+                <label for="file-input" class="upload-button">Browse Files</label>
+            </div>
+        </section>
+
+        <section id="recent-tab" class="tab-content">
+            <h2>Recently Opened</h2>
+            <ul id="recent-list" class="document-list"></ul>
+        </section>
+
+        <section id="favorites-tab" class="tab-content">
+            <h2>Favorites</h2>
+            <ul id="favorites-list" class="document-list"></ul>
+        </section>
+
+        <section id="about-tab" class="tab-content">
+            <h2>About</h2>
+            <p>This is a user-friendly document reader that supports various file types. It is designed to be a Progressive Web App (PWA) with offline capabilities.
+        </section>
+        
+        <section id="reader-view" class="reader-view">
+            <button id="back-to-list-btn" class="back-button">← Back</button>
+            <div class="reader-header">
+                <div class="document-cover-container">
+                    <img id="document-cover" src="assets/cover-placeholder.svg" alt="Book Cover">
+                </div>
+                <h2 id="document-title"></h2>
+            </div>
+            
+            <div id="controls-container" class="controls-container">
+                <div class="text-display">
+                    <p id="document-text"></p>
+                </div>
+                
+                <div class="playback-controls">
+                    <button id="prev-btn" title="Previous Sentence">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+                    </button>
+                    <button id="play-pause-btn" title="Play/Pause">
+                        <svg id="play-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        <svg id="pause-icon" style="display: none;" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                    </button>
+                    <button id="next-btn" title="Next Sentence">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M16 18h2V6h-2zM6 18l8.5-6L6 6z"/></svg>
+                    </button>
+                </div>
+
+                <div class="settings">
+                    <div class="setting-item">
+                        <label for="voice-select">Voice:</label>
+                        <select id="voice-select"></select>
+                    </div>
+                    <div class="setting-item">
+                        <label for="rate-slider">Speed:</label>
+                        <input type="range" id="rate-slider" min="0.5" max="2" value="1" step="0.1">
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+    
+    <script>
+        // Check for Service Worker support and register it
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js').then(registration => {
+                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                }, err => {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+            });
+        }
+
+        // Set the worker source for the PDF.js library
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.worker.min.js`;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM Element Caching ---
+            const fileInput = document.getElementById('file-input');
+            const documentTextEl = document.getElementById('document-text');
+            const playPauseBtn = document.getElementById('play-pause-btn');
+            const prevBtn = document.getElementById('prev-btn');
+            const nextBtn = document.getElementById('next-btn');
+            const voiceSelect = document.getElementById('voice-select');
+            const rateSlider = document.getElementById('rate-slider');
+            const playIcon = document.getElementById('play-icon');
+            const pauseIcon = document.getElementById('pause-icon');
+            const readerView = document.getElementById('reader-view');
+            const backBtn = document.getElementById('back-to-list-btn');
+            const documentTitleEl = document.getElementById('document-title');
+            const documentCoverEl = document.getElementById('document-cover');
+            const recentListEl = document.getElementById('recent-list');
+            
+            // Tab-related elements
+            const tabsContainer = document.querySelector('.tabs-container');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            // --- State Variables ---
+            let utterance = null;
+            let isPaused = false;
+            let sentences = [];
+            let currentSentenceIndex = 0;
+            let recentDocuments = JSON.parse(localStorage.getItem('recentDocuments')) || [];
+
+            // --- Voice Selection and Playback ---
+            function populateVoiceList() {
+                const voices = speechSynthesis.getVoices();
+                voiceSelect.innerHTML = '';
+                voices.forEach(voice => {
+                    const option = document.createElement('option');
+                    option.textContent = `${voice.name} (${voice.lang})`;
+                    option.value = voice.name;
+                    voiceSelect.appendChild(option);
+                });
+            }
+
+            if (speechSynthesis.onvoiceschanged !== undefined) {
+                speechSynthesis.onvoiceschanged = populateVoiceList;
+            } else {
+                populateVoiceList();
+            }
+
+            function speakCurrentSentence() {
+                if (speechSynthesis.speaking) {
+                    speechSynthesis.cancel();
+                }
+                if (sentences.length === 0) return;
+
+                utterance = new SpeechSynthesisUtterance(sentences[currentSentenceIndex]);
+                const selectedVoice = speechSynthesis.getVoices().find(v => v.name === voiceSelect.value);
+                if (selectedVoice) {
+                    utterance.voice = selectedVoice;
+                }
+                utterance.rate = rateSlider.value;
+
+                highlightText(currentSentenceIndex);
+
+                utterance.onend = () => {
+                    if (currentSentenceIndex < sentences.length - 1) {
+                        currentSentenceIndex++;
+                        speakCurrentSentence();
+                    } else {
+                        // All sentences read, mark document as finished
+                        markDocumentAsRead(documentTitleEl.textContent);
+                        isPaused = false;
+                        updatePlayPauseButton();
+                        highlightText(-1);
+                    }
+                };
+                
+                speechSynthesis.speak(utterance);
+                isPaused = false;
+                updatePlayPauseButton();
+            }
+
+            function highlightText(index) {
+                const textElements = documentTextEl.querySelectorAll('span');
+                textElements.forEach((span, i) => {
+                    if (i === index) {
+                        span.classList.add('highlight');
+                        // Use smooth scroll to keep the current sentence in view
+                        span.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    } else {
+                        span.classList.remove('highlight');
+                    }
+                });
+            }
+
+            function updatePlayPauseButton() {
+                if (isPaused) {
+                    playIcon.style.display = 'inline';
+                    pauseIcon.style.display = 'none';
+                } else {
+                    playIcon.style.display = 'none';
+                    pauseIcon.style.display = 'inline';
+                }
+            }
+
+            // --- Document Parsing ---
+            async function parseDocument(file) {
+                const fileType = file.name.split('.').pop().toLowerCase();
+                let text = '';
+                let coverUrl = 'assets/cover-placeholder.svg';
+                
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        const arrayBuffer = e.target.result;
+
+                        try {
+                            if (fileType === 'docx') {
+                                const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+                                text = result.value;
+                            } else if (fileType === 'pdf') {
+                                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                                // Get cover image from the first page
+                                const page = await pdf.getPage(1);
+                                const viewport = page.getViewport({ scale: 1.0 });
+                                const canvas = document.createElement('canvas');
+                                const context = canvas.getContext('2d');
+                                canvas.width = viewport.width;
+                                canvas.height = viewport.height;
+                                await page.render({ canvasContext: context, viewport: viewport }).promise;
+                                coverUrl = canvas.toDataURL('image/jpeg', 0.8);
+                                
+                                for (let i = 1; i <= pdf.numPages; i++) {
+                                    const page = await pdf.getPage(i);
+                                    const content = await page.getTextContent();
+                                    text += content.items.map(item => item.str).join(' ') + ' ';
+                                }
+                            } else if (fileType === 'epub') {
+                                const book = ePub(arrayBuffer);
+                                await book.ready;
+                                const spine = book.spine.items;
+                                for (const item of spine) {
+                                    const contents = await item.load(book.load.bind(book));
+                                    const parser = new DOMParser();
+                                    const doc = parser.parseFromString(contents, "text/html");
+                                    text += doc.body.textContent || doc.body.innerText;
+                                }
+                            } else if (fileType === 'txt') {
+                                const decoder = new TextDecoder('utf-8');
+                                text = decoder.decode(arrayBuffer);
+                            }
+                            resolve({ text, coverUrl });
+                        } catch (error) {
+                            reject(error);
+                        }
+                    };
+                    reader.onerror = reject;
+                    reader.readAsArrayBuffer(file);
+                });
+            }
+
+            // --- UI and Tab Management ---
+            function showTab(tabId) {
+                tabContents.forEach(tab => tab.classList.remove('active'));
+                document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                
+                document.getElementById(`${tabId}-tab`).classList.add('active');
+                document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+            }
+
+            function showReaderView() {
+                tabContents.forEach(tab => tab.classList.remove('active'));
+                readerView.classList.add('active');
+            }
+            
+            function renderRecentDocuments() {
+                // Clear the list before re-rendering
+                recentListEl.innerHTML = '';
+                recentDocuments.forEach(doc => {
+                    const li = document.createElement('li');
+                    li.textContent = doc.name;
+                    li.dataset.docName = doc.name;
+                    if (doc.isRead) {
+                        li.classList.add('read');
+                    }
+                    recentListEl.appendChild(li);
+                });
+            }
+
+            function markDocumentAsRead(docName) {
+                // Find the document and set its 'isRead' flag to true
+                const docIndex = recentDocuments.findIndex(doc => doc.name === docName);
+                if (docIndex !== -1) {
+                    recentDocuments[docIndex].isRead = true;
+                    localStorage.setItem('recentDocuments', JSON.stringify(recentDocuments));
+                    renderRecentDocuments();
+                }
+            }
+
+            // --- Event Listeners ---
+            fileInput.addEventListener('change', async (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    try {
+                        if (speechSynthesis.speaking) {
+                            speechSynthesis.cancel();
+                        }
+                        
+                        const { text, coverUrl } = await parseDocument(file);
+                        
+                        documentTitleEl.textContent = file.name;
+                        documentCoverEl.src = coverUrl;
+
+                        sentences = text.split(/[.?!]/).map(s => s.trim()).filter(s => s.length > 0);
+                        documentTextEl.innerHTML = sentences.map(s => `<span>${s}.</span>`).join(' ');
+                        
+                        showReaderView();
+                        
+                        currentSentenceIndex = 0;
+                        speakCurrentSentence();
+
+                        // Check if document already exists to avoid duplicates
+                        const existingDocIndex = recentDocuments.findIndex(doc => doc.name === file.name);
+                        if (existingDocIndex !== -1) {
+                            // Remove and re-add to put it at the top
+                            const existingDoc = recentDocuments.splice(existingDocIndex, 1)[0];
+                            recentDocuments.unshift(existingDoc);
+                        } else {
+                            recentDocuments.unshift({ name: file.name, cover: coverUrl, content: text, isRead: false });
+                        }
+                        localStorage.setItem('recentDocuments', JSON.stringify(recentDocuments));
+                        renderRecentDocuments();
+
+                    } catch (error) {
+                        console.error('Error processing file:', error);
+                    }
+                }
+            });
+            
+            recentListEl.addEventListener('click', (event) => {
+                const listItem = event.target.closest('li');
+                if (listItem) {
+                    const docName = listItem.dataset.docName;
+                    const doc = recentDocuments.find(d => d.name === docName);
+                    if (doc) {
+                        // Manually load the document content from localStorage
+                        documentTitleEl.textContent = doc.name;
+                        documentCoverEl.src = doc.cover;
+                        sentences = doc.content.split(/[.?!]/).map(s => s.trim()).filter(s => s.length > 0);
+                        documentTextEl.innerHTML = sentences.map(s => `<span>${s}.</span>`).join(' ');
+                        showReaderView();
+                        currentSentenceIndex = 0;
+                        speakCurrentSentence();
+                    }
+                }
+            });
+
+            playPauseBtn.addEventListener('click', () => {
+                if (isPaused) {
+                    speechSynthesis.resume();
+                    isPaused = false;
+                } else {
+                    speechSynthesis.pause();
+                    isPaused = true;
+                }
+                updatePlayPauseButton();
+            });
+
+            prevBtn.addEventListener('click', () => {
+                if (currentSentenceIndex > 0) {
+                    currentSentenceIndex--;
+                    speakCurrentSentence();
+                }
+            });
+
+            nextBtn.addEventListener('click', () => {
+                if (currentSentenceIndex < sentences.length - 1) {
+                    currentSentenceIndex++;
+                    speakCurrentSentence();
+                }
+            });
+
+            voiceSelect.addEventListener('change', () => {
+                if (sentences.length > 0) {
+                    speakCurrentSentence();
+                }
+            });
+
+            rateSlider.addEventListener('input', () => {
+                if (utterance) {
+                    utterance.rate = rateSlider.value;
+                }
+            });
+
+            backBtn.addEventListener('click', () => {
+                if (speechSynthesis.speaking) {
+                    speechSynthesis.cancel();
+                }
+                readerView.classList.remove('active');
+                showTab('browse');
+            });
+            
+            tabsContainer.addEventListener('click', (event) => {
+                const tabButton = event.target.closest('.tab-button');
+                if (tabButton) {
+                    showTab(tabButton.dataset.tab);
+                }
+            });
+
+            // Initial render of recent documents on page load
+            renderRecentDocuments();
+        });
+    </script>
+</body>
+</html>

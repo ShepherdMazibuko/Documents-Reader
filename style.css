@@ -1,0 +1,333 @@
+/*
+ * style.css
+ * Optimized for low-end mobile devices with a focus on performance.
+ * The color palette has been updated to use complementary, earthy tones.
+ */
+
+/* -------------------------------------------------- */
+/* Global and Body Styles                             */
+/* -------------------------------------------------- */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    /* Color palette: Earthy & Simple */
+    --primary-green: #4caf50;
+    --primary-yellow: #ffc107;
+    --calming-red: #ef9a9a;
+    --neutral-accent: #607d8b; /* New Blue-Grey accent color */
+    --text-color: #333333;
+    --background-color: #f4f7f9;
+    --card-background: #fff;
+    --border-color: #e0e0e0;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    padding: 10px;
+}
+
+/* Main container and content */
+.main-content {
+    flex-grow: 1;
+    max-width: 900px;
+    width: 100%;
+    margin: 0 auto;
+    background-color: var(--card-background);
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Hide inactive tabs and reader view */
+.tab-content, .reader-view {
+    display: none;
+}
+
+.tab-content.active, .reader-view.active {
+    display: block;
+}
+
+/* -------------------------------------------------- */
+/* Header and Navigation                              */
+/* -------------------------------------------------- */
+.app-header {
+    background-color: var(--card-background);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.app-title {
+    color: var(--primary-green);
+    font-size: 1.8rem;
+    margin-bottom: 5px;
+}
+
+.tabs-container {
+    display: flex;
+    justify-content: space-around;
+    width: 100%;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.tab-button {
+    background: none;
+    border: none;
+    padding: 10px 5px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--neutral-accent); /* Updated to use the new accent color */
+    cursor: pointer;
+    flex: 1;
+}
+
+.tab-button.active {
+    color: var(--primary-green);
+    border-bottom: 2px solid var(--primary-green);
+}
+
+/* -------------------------------------------------- */
+/* Upload and Tab Content                             */
+/* -------------------------------------------------- */
+.upload-area {
+    text-align: center;
+    padding: 30px 10px;
+    border: 1px dashed var(--border-color);
+    border-radius: 6px;
+    margin-top: 15px;
+}
+
+.upload-button {
+    display: inline-block;
+    padding: 10px 20px;
+    border-radius: 20px;
+    background-color: var(--primary-green);
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+.document-list {
+    list-style: none;
+    padding: 0;
+}
+
+.document-list li {
+    padding: 10px;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    font-size: 0.95rem;
+}
+
+.document-list li:hover {
+    background-color: #f9f9f9;
+}
+
+.document-list li.read {
+    /* Style for read documents */
+    background-color: var(--calming-red);
+}
+
+/* -------------------------------------------------- */
+/* Reader View                                        */
+/* -------------------------------------------------- */
+.reader-view {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+}
+
+.back-button {
+    align-self: flex-start;
+    background: none;
+    border: none;
+    font-size: 1rem;
+    color: var(--primary-green);
+    cursor: pointer;
+}
+
+.reader-header {
+    text-align: center;
+}
+
+.document-cover-container {
+    width: 100px;
+    height: 140px;
+    background-color: #ddd;
+    border-radius: 6px;
+    overflow: hidden;
+    margin: 0 auto 10px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+#document-cover {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+#document-title {
+    font-size: 1.2rem;
+    color: var(--text-color);
+}
+
+.text-display {
+    text-align: left;
+    font-size: 1rem;
+    line-height: 1.6;
+    background-color: var(--card-background);
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    max-height: 300px;
+    overflow-y: auto;
+    width: 100%;
+}
+
+.text-display p {
+    margin: 0;
+}
+
+/* Highlight the current sentence with a subtle background color */
+.text-display span.highlight {
+    background-color: #e6f2ff;
+    padding: 1px 2px;
+    border-radius: 2px;
+    font-weight: bold;
+}
+
+/* -------------------------------------------------- */
+/* Playback Controls and Settings                     */
+/* -------------------------------------------------- */
+.playback-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+
+.playback-controls button {
+    background-color: var(--primary-green);
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s ease; /* Smooth transition for color change */
+}
+
+/* Color change on hover and active state */
+.playback-controls button:hover,
+.playback-controls button:active {
+    background-color: var(--primary-yellow);
+}
+
+.playback-controls button svg {
+    fill: #fff;
+    width: 24px;
+    height: 24px;
+}
+
+.playback-controls #play-pause-btn {
+    /* Larger size for the main button */
+    width: 60px;
+    height: 60px;
+}
+
+.playback-controls #play-pause-btn svg {
+    width: 28px;
+    height: 28px;
+}
+
+/* Styles for when the button is in a paused state */
+#play-pause-btn.paused {
+    background-color: var(--primary-yellow);
+}
+
+
+.settings {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    width: 100%;
+    margin-top: 10px;
+}
+
+.setting-item {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+label {
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: var(--neutral-accent); /* Updated to use the new accent color */
+    font-size: 0.9rem;
+}
+
+select, input[type="range"] {
+    background-color: #f0f4f8;
+    border: 1px solid #dcdfe4;
+    padding: 8px;
+    border-radius: 4px;
+    min-width: 120px;
+}
+
+/* -------------------------------------------------- */
+/* Media Queries for larger screens (e.g., tablets, desktops) */
+/* -------------------------------------------------- */
+@media (min-width: 768px) {
+    body {
+        padding: 20px;
+    }
+    
+    .main-content {
+        padding: 40px;
+    }
+    
+    .app-title {
+        font-size: 2.2rem;
+    }
+    
+    .tab-button {
+        padding: 15px 20px;
+        font-size: 1rem;
+    }
+    
+    .playback-controls button {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .playback-controls button svg {
+        width: 28px;
+        height: 28px;
+    }
+    
+    .settings {
+        flex-direction: row;
+        align-items: flex-start;
+        gap: 40px;
+    }
+}
